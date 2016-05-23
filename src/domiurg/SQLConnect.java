@@ -1,6 +1,7 @@
 package domiurg;
 
 import java.sql.*;
+import java.util.*;
 
 public class SQLConnect {
     private static final int SIZE = 50;
@@ -13,48 +14,38 @@ public class SQLConnect {
     private String password;
     private String URL;
 
-    private double[] last = new double[SIZE];
-    private double[] curr = new double[SIZE];
+    private HashMap last = new HashMap();
+    private HashMap curr = new HashMap();
     private boolean firstTime;
 
     public SQLConnect(){
-        this.connect = null;
-        this.statement = null;
-        this.res = null;
+        connect = null;
+        statement = null;
+        res = null;
 
-        this.login = "arduino_user";
-        this.password = "sometext";
-        this.URL = "jdbc:mysql://domiurg-lab.duckdns.org/arduino_user?";
+        login = "arduino_user";
+        password = "sometext";
+        URL = "jdbc:mysql://domiurg-lab.duckdns.org/arduino_user?";
 
-        for (int i = 0; i < SIZE; i++){
-            this.last[i] = 0;
-            this.curr[i] = 0;
-        }
-
-        this.firstTime = true;
+        firstTime = true;
     }
 
     public SQLConnect(String host, String db, String user, String pass){
-        this.connect = null;
-        this.statement = null;
-        this.res = null;
+        connect = null;
+        statement = null;
+        res = null;
 
-        this.login = user;
-        this.password = pass;
-        this.URL = "jdbc://mysql://" + host + "/" + db + "?";
+        login = user;
+        password = pass;
+        URL = "jdbc://mysql://" + host + "/" + db + "?";
 
-        for (int i = 0; i < SIZE; i++){
-            this.last[i] = 0;
-            this.curr[i] = 0;
-        }
-
-        this.firstTime = true;
+        firstTime = true;
     }
 
-    public double[] readDB () throws Exception {
+    public HashMap readDB () throws Exception {
         try {
             Class.forName("com.mysql.jdbc.Driver").newInstance();
-            connect = DriverManager.getConnection(URL, this.login, this.password);
+            connect = DriverManager.getConnection(URL, login, password);
 
             statement = connect.createStatement();
 
@@ -63,39 +54,54 @@ public class SQLConnect {
                             " ORDER BY `id` DESC" +
                             " LIMIT " + SIZE;
             res = statement.executeQuery(query);
-            getResult(res);
+            return getResult(res);
 
         } catch (Exception e){
             throw e;
         }
-
-        return curr;
     }
 
-    private double[] getResult(ResultSet res) throws SQLException{
-        int i = 0;
+    private HashMap getResult(ResultSet res) throws SQLException{
         while (res.next()){
             // Print results to console as debug info
             String id = res.getString("id");
             String time = res.getString("time");
             String temp = res.getString("temperature");
             String humi = res.getString("humidity");
+            
 
-            if (this.firstTime){
-                this.last[i] = Double.parseDouble(humi);
+            //add Humidity to the list
+            if (firstTime){
+               last.put(id, humi);
             } else
-                this.curr[i] = Double.parseDouble(humi);
+                curr.put(id, humi);
 
-            System.out.println("ID: " + id);
-            System.out.println("Time: " + time);
-            System.out.println("Temperature: " + temp);
-            System.out.println("Humidity: " + humi);
-            System.out.println("");
-
-            i++;
+//            System.out.println("ID: " + id);
+//            System.out.println("Time: " + time);
+//            System.out.println("Temperature: " + temp);
+//            System.out.println("Humidity: " + humi);
+//            System.out.println("");
         }
 
-        return curr;
-    }
+        //Get new values
+        if (!firstTime){
+            HashMap result = new HashMap();
+            Set set = curr.entrySet();
+            Iterator i = set.iterator();
+            while (i.hasNext()){
+                Map.Entry tuple = (Map.Entry)i.next();
+                if (!last.containsKey(tuple.getKey()))
+                    result.put(tuple.getKey(), tuple.getValue());
+            }
 
+            //copy current HashMap into Last
+            last.clear();
+            last = new HashMap(curr);
+            return result;
+        }
+        else {
+            firstTime = false;
+            return last;
+        }
+    }
 }
